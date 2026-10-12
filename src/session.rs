@@ -15,6 +15,7 @@ impl<Identity> VerifiedApplicationAuthentication<Identity> {
     /// Assert that the caller's verifier authenticated this identity for this connection.
     /// Tau performs no cryptographic verification. Prefer `Session::verify_application`
     /// to bind a verifier's result to the context it actually received.
+    /// Reserved for trusted adapters that already perform verification outside Tau.
     pub fn assert_verified(connection_id: ConnectionId, identity: Identity) -> Self {
         Self {
             connection_id,
@@ -93,6 +94,9 @@ impl<Role, Identity> Session<Role, Identity> {
     /// The verifier may perform asynchronous I/O and returns an identity or its own error.
     /// Failure does not mutate the session. Success is an assertion by the application,
     /// bound here to this connection, and still requires a validated transition.
+    /// This is the primary application-authentication path. After verification,
+    /// perform attachment or admission checks, then consume the result with
+    /// `authenticate_application`. Verification alone does not commit authentication.
     pub async fn verify_application<'a, Request, Error, Verification>(
         &'a self,
         request: Request,

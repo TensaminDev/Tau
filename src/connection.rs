@@ -10,6 +10,12 @@ use std::net::SocketAddr;
 pub struct ConnectionId(uuid::Uuid);
 
 impl ConnectionId {
+    /// Read-only correlation with an application's UUID-based session registry.
+    /// This identifier names a connection instance, not an authentication credential.
+    pub fn as_uuid(&self) -> uuid::Uuid {
+        self.0
+    }
+
     pub(crate) fn new() -> Self {
         Self(uuid::Uuid::new_v4())
     }

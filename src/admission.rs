@@ -77,6 +77,13 @@ impl<Role> Admission<Role> {
     /// and reject inconsistent identities. Tau cannot validate arbitrary identity types.
     /// Every resolver receives the verified key, even when a centralized key lookup has
     /// already established its relationship to the application principal.
+    /// Omikron can rely on Omega's role-specific key lookup. Decentralized Iota
+    /// derives its canonical node identity from the complete verified public key
+    /// and separately checks the trusted node directory before activation.
+    /// A successful handshake establishes possession of the key accepted by MTP's
+    /// configured resolver; it does not authorize application operations. This
+    /// callback maps that transport result to the application's principal. Directory
+    /// lookups and subsequent authority checks belong to the application.
     pub fn into_session<Identity>(
         self,
         resolve: impl FnOnce(
