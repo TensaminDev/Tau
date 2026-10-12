@@ -1,0 +1,14 @@
+[package]
+name = "tau"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+mtp = { git = "https://git.methanium.net/methanium/mtp", rev = "ad489265deacadd6de52ed2129d071803a0e7247", features = ["host", "crypto"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+mtp = { git = "https://git.methanium.net/methanium/mtp", rev = "ad489265deacadd6de52ed2129d071803a0e7247", features = ["web-server", "client"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+rcgen = "0.14"
