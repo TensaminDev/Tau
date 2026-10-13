@@ -16,6 +16,11 @@ impl<Identity> VerifiedApplicationAuthentication<Identity> {
     /// Tau performs no cryptographic verification. Prefer `Session::verify_application`
     /// to bind a verifier's result to the context it actually received.
     /// Reserved for trusted adapters that already perform verification outside Tau.
+    /// The caller must verify the authentication proof, its expected principal,
+    /// and its association with this connection context. The application protocol
+    /// must enforce replay restrictions, and the caller must have authority to
+    /// assert this identity. Tau checks only the subsequent state transition and
+    /// connection ID, not these preconditions.
     pub fn assert_verified(connection_id: ConnectionId, identity: Identity) -> Self {
         Self {
             connection_id,
@@ -32,6 +37,9 @@ pub enum SessionOutcome {
 }
 
 /// State for one logical connection, without transport ownership or a reconnect registry.
+/// Lifecycle moves from admitted to active to closed, or directly to closed.
+/// Authentication upgrades once while open and never changes transport provenance.
+/// The first terminal outcome is retained across every later close or rejection.
 pub struct Session<Role, Identity> {
     id: ConnectionId,
     role: Role,

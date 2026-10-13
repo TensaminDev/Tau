@@ -3,6 +3,9 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LifecycleState {
     Admitted,
+    /// The application accepted responsibility for handling this connection.
+    /// This does not imply registry publication, routing availability, handler
+    /// readiness, or that the physical transport remains connected.
     Active,
     Closed,
 }

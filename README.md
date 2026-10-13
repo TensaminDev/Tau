@@ -108,6 +108,8 @@ its attachment and activation checks succeed.
 existing verifier integrations. It is a trusted caller assertion, not a proof
 created or verified by Tau. Construct it only after the application's verifier
 validates the proof, identity, key, challenge and connection binding.
+The application must enforce replay restrictions and authorize the caller to
+assert that identity.
 The result contains the target `ConnectionId` and cannot be applied to another
 connection. Tau does not verify signatures or grant application permissions.
 
@@ -126,6 +128,9 @@ and application policy rather than the original description alone.
 
 Call `activate()` when application handling starts and `close()` after it ends.
 Activation is allowed once, from `Admitted`. Closing is terminal and idempotent.
+Active means the application accepted handling responsibility. It does not
+promise successful application registry insertion, published peer routes, handler
+availability, or a physically connected transport.
 `reject()` records `SessionOutcome::Rejected` and closes the session without
 changing its verified principal. Normal closure records `SessionOutcome::Closed`.
 Repeated closure or rejection preserves the first terminal outcome.
@@ -157,4 +162,3 @@ Applications own handler selection and must keep an admitted guest in its guest
 handler until application policy accepts a verified upgrade. A handler change
 does not authenticate a principal. Transport-authenticated sessions can still
 fail application activation and be rejected.
-

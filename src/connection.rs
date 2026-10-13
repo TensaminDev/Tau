@@ -24,6 +24,8 @@ impl ConnectionId {
 /// Trusted post-handshake metadata supplied by the application adapter.
 /// `Authenticated` must come from MTP's successful verification, never a peer's claim.
 /// Description, version, path and remote address are policy context, not identity proof.
+/// Production facts must originate from a trusted MTP connection. Tau does not
+/// cryptographically verify hand-constructed values, which remain useful in tests.
 pub struct ConnectionFacts<'a> {
     pub mtp_client_id: u64,
     pub description: Option<&'a str>,
