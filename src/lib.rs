@@ -1,16 +1,40 @@
-//! Post-handshake admission and session context. The application owns the transport.
+//! Post-handshake admission, session context, and shared protocol helpers.
+//! The application owns the transport.
 mod admission;
 mod auth;
 mod connection;
 mod error;
+mod framing;
+mod keyring;
 mod lifecycle;
+mod mtp_compat;
+mod requests;
 mod role;
+mod route;
+mod security;
 mod session;
 
 pub use admission::{Admission, AdmissionEngine};
 pub use auth::{ApplicationAuthentication, TransportAuthentication};
 pub use connection::{ConnectionFacts, ConnectionId};
 pub use error::AdmissionError;
+pub use framing::{
+    CommunicationResponseExt, data_i64, data_string, error_response, typed_container,
+};
+pub use keyring::{
+    MAX_PRIVATE_KEYRING_BYTES, create_private_keyring, load_private_keyring, open_private_keyring,
+    read_private_keyring, replace_private_keyring, verify_private_keyring,
+};
 pub use lifecycle::LifecycleState;
+pub use mtp_compat::{
+    MtpFieldError, OptionalDataValueExt, ProtocolValueError, RequiredCommunicationFields,
+    positive_data_i64,
+};
+pub use requests::{
+    CorrelationError, PROTOCOL_ERROR_TYPES, PendingResponse, RequestError, ResponseCorrelator,
+    ResponseExpectation, is_protocol_error,
+};
 pub use role::{AuthenticationRequirement, RoleRule, RoleRules};
+pub use route::RouteTarget;
+pub use security::{MessageSecurityClass, RELAY_ONLY_TYPES, message_security_class_with};
 pub use session::{Session, SessionOutcome, VerifiedApplicationAuthentication};
