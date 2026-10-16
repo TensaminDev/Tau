@@ -1,5 +1,14 @@
 protocol_version: "3.0"
 type_maps:
+  "1.0":
+    CommunicationTypes:
+      ProtectedMessage: 40
+      MessageSend: 41
+    DataTypes:
+      SecurePayload: 43
+      VersionNumber: 44
+      ChatId: 45
+      SecretId: 46
   "3.0":
     CommunicationTypes:
       ProtectedMessage: 32

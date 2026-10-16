@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-mtp = { git = "https://git.methanium.net/methanium/mtp", rev = "ad489265deacadd6de52ed2129d071803a0e7247", features = ["host", "crypto"] }
+mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "9f7f94e4cbd227610784ae47a1e7a1acf66f8584", features = ["host", "crypto"] }
 dashmap = "6.1"
 thiserror = "2"
 tokio = { version = "1", features = ["sync", "time"] }
@@ -15,6 +15,6 @@ zeroize = "1"
 libc = "0.2"
 
 [dev-dependencies]
-mtp = { git = "https://git.methanium.net/methanium/mtp", rev = "ad489265deacadd6de52ed2129d071803a0e7247", features = ["web-server", "client"] }
+mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "9f7f94e4cbd227610784ae47a1e7a1acf66f8584", features = ["web-server", "client"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 rcgen = "0.14"

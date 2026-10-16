@@ -157,7 +157,7 @@ fn tampering_and_inner_outer_binding() {
     resign(&mut plaintext, &sender);
     assert!(
         verify_outer(
-            &plaintext.to_json().unwrap(),
+            &serde_json::to_vec(&plaintext).unwrap(),
             &[sender.public_key_bundle()],
             None,
             None
@@ -188,7 +188,7 @@ fn tampering_and_inner_outer_binding() {
         }
         assert!(
             verify_outer(
-                &changed.to_json().unwrap(),
+                &serde_json::to_vec(&changed).unwrap(),
                 &[sender.public_key_bundle()],
                 None,
                 None
@@ -209,7 +209,7 @@ fn tampering_and_inner_outer_binding() {
         resign(&mut changed, &sender);
         assert!(
             verify_and_open(
-                &changed.to_json().unwrap(),
+                &serde_json::to_vec(&changed).unwrap(),
                 &[sender.public_key_bundle()],
                 &recipient,
                 None,
@@ -222,10 +222,31 @@ fn tampering_and_inner_outer_binding() {
     for id in ["".to_owned(), "x".repeat(257)] {
         let mut changed = wire.clone();
         changed.message_id = id;
-        resign(&mut changed, &sender);
+        let limits = RelayProtocolLimits {
+            max_message_id_bytes: 257,
+            ..RelayProtocolLimits::default()
+        };
+        let signing = DualSigner::new(
+            &sender.sig_cl_secret_key,
+            &sender.sig_pq_secret_key,
+            &sender.sig_pq_public_key,
+        )
+        .unwrap();
+        changed.signature = STANDARD.encode(
+            signing
+                .sign(
+                    &canonical_bytes_with_limits(
+                        &changed,
+                        &STANDARD.decode(&changed.content).unwrap(),
+                        &limits,
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+        );
         assert!(
             verify_outer(
-                &changed.to_json().unwrap(),
+                &serde_json::to_vec(&changed).unwrap(),
                 &[sender.public_key_bundle()],
                 None,
                 None

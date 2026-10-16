@@ -5,6 +5,18 @@ fn js_error(error: Error) -> JsValue {
     JsValue::from_str(&error.to_string())
 }
 
+/// The fixed codec map for Relay V2 protected envelopes, independent of application maps.
+#[wasm_bindgen]
+pub fn relay_protected_type_map_version() -> String {
+    PROTECTED_TYPE_MAP_VERSION.to_owned()
+}
+
+/// The application map selected by MTP's default frame producer.
+#[wasm_bindgen]
+pub fn relay_application_type_map_version() -> String {
+    DEFAULT_APPLICATION_TYPE_MAP_VERSION.to_string()
+}
+
 #[wasm_bindgen]
 #[allow(clippy::too_many_arguments)]
 pub fn relay_sign_protected(
@@ -52,25 +64,19 @@ pub fn relay_verify_and_open(
 
 #[wasm_bindgen]
 pub fn relay_canonical_chat_id(first_json: &str, second_json: &str) -> Result<String, JsValue> {
+    let limits = RelayProtocolLimits::default();
     Ok(canonical_chat_id(
-        &serde_json::from_str(first_json)
-            .map_err(Error::from)
-            .map_err(js_error)?,
-        &serde_json::from_str(second_json)
-            .map_err(Error::from)
-            .map_err(js_error)?,
+        &bridge::principal(first_json, &limits).map_err(js_error)?,
+        &bridge::principal(second_json, &limits).map_err(js_error)?,
     ))
 }
 
 #[wasm_bindgen]
 pub fn relay_chat_participants(first_json: &str, second_json: &str) -> Result<String, JsValue> {
+    let limits = RelayProtocolLimits::default();
     let participants = canonical_chat_participants(
-        &serde_json::from_str(first_json)
-            .map_err(Error::from)
-            .map_err(js_error)?,
-        &serde_json::from_str(second_json)
-            .map_err(Error::from)
-            .map_err(js_error)?,
+        &bridge::principal(first_json, &limits).map_err(js_error)?,
+        &bridge::principal(second_json, &limits).map_err(js_error)?,
     );
     serde_json::to_string(&participants)
         .map_err(Error::from)

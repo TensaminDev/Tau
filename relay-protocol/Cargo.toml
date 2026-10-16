@@ -12,11 +12,12 @@ crate-type = ["rlib", "cdylib"]
 wasm = ["dep:wasm-bindgen", "dep:mtp-crypto", "dep:getrandom"]
 
 [dependencies]
-mtp = { git = "https://git.methanium.net/methanium/mtp", rev = "ad489265deacadd6de52ed2129d071803a0e7247", default-features = false, features = ["crypto"] }
+mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "9f7f94e4cbd227610784ae47a1e7a1acf66f8584", default-features = false, features = ["crypto"] }
+mtp-type-map = { git = "https://github.com/Nonanium/MTP.git", rev = "9f7f94e4cbd227610784ae47a1e7a1acf66f8584", features = ["registry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
 thiserror = "2"
 wasm-bindgen = { version = "0.2", optional = true }
-mtp-crypto = { git = "https://git.methanium.net/methanium/mtp", rev = "ad489265deacadd6de52ed2129d071803a0e7247", features = ["wasm"], optional = true }
+mtp-crypto = { git = "https://github.com/Nonanium/MTP.git", rev = "9f7f94e4cbd227610784ae47a1e7a1acf66f8584", features = ["wasm"], optional = true }
 getrandom = { version = "0.2", features = ["js"], optional = true }
