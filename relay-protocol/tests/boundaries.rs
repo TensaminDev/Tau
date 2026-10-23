@@ -15,7 +15,6 @@ fn principal(authority: &str, user_id: u64) -> Principal {
 // Structurally valid, deliberately unsigned. Public parsing must not perform crypto.
 fn wire() -> RelayWire {
     RelayWire {
-        version: 2,
         signer: principal("a", 1),
         recipient: principal("b", 2),
         destination: format!("iota:v1:{}", "a".repeat(64)),
@@ -85,7 +84,7 @@ fn public_wire_boundaries_include_serialized_bytes_and_json_structure() {
     let limits = RelayProtocolLimits {
         max_wire_bytes: json.len(),
         max_depth: 2,
-        max_fields: 27,
+        max_fields: 25,
         ..RelayProtocolLimits::default()
     };
     wire.validate_with_limits(&limits).unwrap();
@@ -107,14 +106,14 @@ fn public_wire_boundaries_include_serialized_bytes_and_json_structure() {
             ..limits
         },
         RelayProtocolLimits {
-            max_fields: 26,
+            max_fields: 24,
             ..limits
         },
     ] {
         let (field, actual, max) = if limits.max_depth == 1 {
             ("JSON depth", 2, 1)
-        } else if limits.max_fields == 26 {
-            ("JSON fields", 27, 26)
+        } else if limits.max_fields == 24 {
+            ("JSON fields", 25, 24)
         } else {
             ("JSON bytes", json.len(), json.len() - 1)
         };
@@ -207,7 +206,6 @@ fn principal_and_identity_limits_measure_utf8_bytes() {
 fn public_wire_rejects_semantic_and_schema_errors() {
     let original = wire();
     for field in [
-        "version",
         "signer",
         "recipient",
         "identical",
@@ -219,7 +217,6 @@ fn public_wire_rejects_semantic_and_schema_errors() {
     ] {
         let mut changed = original.clone();
         match field {
-            "version" => changed.version = 1,
             "signer" => changed.signer.authority = " \t\n".into(),
             "recipient" => changed.recipient.authority.clear(),
             "identical" => changed.recipient = changed.signer.clone(),
@@ -248,6 +245,34 @@ fn public_wire_rejects_semantic_and_schema_errors() {
     let json = String::from_utf8(serde_json::to_vec(&original).unwrap()).unwrap();
     assert!(RelayWire::from_json(json.replacen("{", "{\"version\":2,", 1).as_bytes()).is_err());
     assert!(RelayWire::from_json(format!("{json} null").as_bytes()).is_err());
+}
+
+#[test]
+fn federation_frame_rejects_legacy_and_unsigned_outer_metadata() {
+    use mtp::codec::DataType;
+    let frame = wire().into_frame(7).unwrap();
+    RelayWire::from_frame(&frame).unwrap();
+    for field in [DataType::VersionNumber, DataType::Description] {
+        assert!(
+            RelayWire::from_frame(
+                &frame
+                    .clone()
+                    .add_typed_default(field, DataValue::UnsignedNumber(2))
+            )
+            .is_err()
+        );
+    }
+    assert!(RelayWire::from_frame(&frame.clone().with_sender(1)).is_err());
+    assert!(RelayWire::from_frame(&frame.clone().with_receiver(2)).is_err());
+    let mut value = serde_json::to_value(wire()).unwrap();
+    value["version"] = 2.into();
+    let legacy =
+        CommunicationValue::new_with_type_map(CommunicationType::Relay, frame.type_map().unwrap())
+            .add_typed_default(
+                DataType::SecurePayload,
+                DataValue::Bytes(serde_json::to_vec(&value).unwrap()),
+            );
+    assert!(RelayWire::from_frame(&legacy).is_err());
 }
 
 #[test]

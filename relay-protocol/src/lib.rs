@@ -1,4 +1,4 @@
-//! Transport-neutral Relay V2. Identity resolution and durable replay handling belong to callers.
+//! Transport-neutral federation relay. Identity resolution and durable replay belong to callers.
 
 use base64::{
     Engine as _,
@@ -12,7 +12,7 @@ use mtp::codec::{
 use mtp::crypto::{DualSigner, Keyring, PublicKeyBundle, SignatureScheme};
 use serde::{Deserialize, Serialize};
 
-pub const SIGNING_DOMAIN: &[u8] = b"tensamin-federated-relay:v2";
+pub const SIGNING_DOMAIN: &[u8] = b"tensamin-federated-relay\0";
 pub const RELAY_CONTENT_SIGNATURE: ProtectionPurpose = ProtectionPurpose(0x31);
 pub const RELAY_CONTENT_ENCRYPTION: ProtectionPurpose = ProtectionPurpose(0x32);
 /// Fixed map for the encrypted ProtectedMessage, independent of the signed application map.
@@ -35,7 +35,6 @@ pub struct Principal {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RelayWire {
-    pub version: u32,
     pub signer: Principal,
     pub recipient: Principal,
     pub destination: String,
@@ -54,7 +53,7 @@ pub enum Error {
         actual: usize,
         max: usize,
     },
-    #[error("invalid Relay V2: {0}")]
+    #[error("invalid federation relay: {0}")]
     Invalid(&'static str),
     #[error("JSON: {0}")]
     Json(#[from] serde_json::Error),
@@ -69,6 +68,34 @@ fn mtp_error(error: impl std::fmt::Display) -> Error {
 }
 
 impl RelayWire {
+    /// The sole federation envelope metadata is SecurePayload. Correlation IDs are transport-local.
+    pub fn from_frame(frame: &CommunicationValue) -> Result<Self, Error> {
+        if !frame.is_type(CommunicationType::Relay)
+            || frame.sender().is_some()
+            || frame.receiver().is_some()
+        {
+            return Err(Error::Invalid("not a federation relay"));
+        }
+        let map = frame.type_map().ok_or(Error::Invalid("missing type map"))?;
+        let payload_id = DataType::SecurePayload
+            .try_to_id(map)
+            .ok_or(Error::Invalid("missing SecurePayload mapping"))?;
+        let DataValue::Container(fields) = frame.payload() else {
+            return Err(Error::Invalid("envelope must be a container"));
+        };
+        if fields.len() != 1 || fields[0].0 != payload_id {
+            return Err(Error::Invalid("unexpected federation envelope metadata"));
+        }
+        let DataValue::Bytes(json) = &fields[0].1 else {
+            return Err(Error::Invalid("missing signed relay"));
+        };
+        let wire = Self::from_json(json)?;
+        if wire.type_map_version != map.version.to_string() {
+            return Err(Error::Invalid("outer and signed type maps disagree"));
+        }
+        Ok(wire)
+    }
+
     /// Bounded structural decoding. This does not authenticate the relay.
     pub fn from_json(json: &[u8]) -> Result<Self, Error> {
         Self::from_json_with_limits(json, &RelayProtocolLimits::default())
@@ -95,9 +122,9 @@ impl RelayWire {
         {
             return Err(Error::Invalid("dual signature length"));
         }
-        // RelayWire's fixed schema has two object levels and 27 JSON value/key tokens.
+        // RelayWire's fixed schema has two object levels and 25 JSON value/key tokens.
         bound("JSON depth", 2, limits.max_depth)?;
-        bound("JSON fields", 27, limits.max_fields)?;
+        bound("JSON fields", 25, limits.max_fields)?;
         limits::json_size(self, limits.max_wire_bytes)
     }
 
@@ -126,7 +153,6 @@ impl RelayWire {
         Ok(
             CommunicationValue::new_with_type_map(CommunicationType::Relay, &map)
                 .with_id(frame_id)
-                .add_typed_default(DataType::VersionNumber, DataValue::UnsignedNumber(2))
                 .add_typed_default(DataType::SecurePayload, DataValue::Bytes(json)),
         )
     }
@@ -185,9 +211,6 @@ fn validate_lengths(wire: &RelayWire, limits: &RelayProtocolLimits) -> Result<()
 
 fn validate(wire: &RelayWire, limits: &RelayProtocolLimits) -> Result<(), Error> {
     validate_lengths(wire, limits)?;
-    if wire.version != 2 {
-        return Err(Error::Invalid("version"));
-    }
     for principal in [&wire.signer, &wire.recipient] {
         if principal.authority.trim().is_empty() {
             return Err(Error::Invalid("authority"));
@@ -247,7 +270,7 @@ fn push(bytes: &mut Vec<u8>, value: &[u8]) -> Result<(), Error> {
 }
 
 pub fn derived_message_id(message_id: &str) -> mtp::common::MessageId {
-    let mut bytes = b"tensamin-relay-message:v2".to_vec();
+    let mut bytes = b"tensamin-relay-message\0".to_vec();
     bytes.extend_from_slice(message_id.as_bytes());
     let hash = mtp::crypto::sha256(&bytes);
     mtp::common::MessageId::new(u128::from_be_bytes(
@@ -308,7 +331,6 @@ pub fn sign_protected_with_limits(
         return Err(Error::Invalid("nested relay"));
     }
     let mut wire = RelayWire {
-        version: 2,
         signer,
         recipient,
         destination,
@@ -562,7 +584,7 @@ fn sorted_pair<'a>(first: &'a Principal, second: &'a Principal) -> [&'a Principa
 
 pub fn canonical_chat_id(first: &Principal, second: &Principal) -> String {
     format!(
-        "principal:v2:{}",
+        "principal:{}",
         URL_SAFE_NO_PAD
             .encode(serde_json::to_vec(&sorted_pair(first, second)).expect("principal JSON"))
     )

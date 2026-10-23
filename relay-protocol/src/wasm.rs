@@ -5,7 +5,7 @@ fn js_error(error: Error) -> JsValue {
     JsValue::from_str(&error.to_string())
 }
 
-/// The fixed codec map for Relay V2 protected envelopes, independent of application maps.
+/// The fixed codec map for federation protected envelopes, independent of application maps.
 #[wasm_bindgen]
 pub fn relay_protected_type_map_version() -> String {
     PROTECTED_TYPE_MAP_VERSION.to_owned()

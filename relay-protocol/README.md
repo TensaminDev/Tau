@@ -1,4 +1,4 @@
-# Relay V2 protocol
+# Federation relay protocol
 
 `tau-relay-protocol` is independent of the Tau host, Iota identity resolver and storage.
 It uses the same pinned MTP revision as the native applications, with MTP's
@@ -11,11 +11,11 @@ to a browser.
 - `Principal { authority: String, user_id: u64 }`
 - `RelayWire::from_json(bytes)` performs bounded JSON decoding and structural validation. `wire.validate()` applies the same structural policy to an existing struct. Neither authenticates signatures. Direct `serde_json` deserialization does not enforce these limits.
 - `sign_protected(signer, recipient, destination, message_id, created_at, application, &keyring, recipients)` returns `Result<RelayWire, Error>`.
-- `RelayWire::to_json()` returns signed JSON bytes. `into_frame(frame_id)` returns an MTP Relay frame with VersionNumber 2 and SecurePayload containing those bytes.
+- `RelayWire::to_json()` returns signed JSON bytes. `into_frame(frame_id)` returns an MTP Relay frame whose only payload field is SecurePayload containing those bytes. `RelayWire::from_frame()` rejects legacy version fields, unsigned envelope metadata and mismatched type maps.
 - `verify_outer(json, signer_keys, expected_recipient, expected_destination)` authenticates the exact decoded content bytes and returns `VerifiedRelay { wire, protected }`.
 - `verify_and_open(json, signer_keys, keyring, expected_recipient, expected_destination)` additionally decrypts, verifies the inner dual signature and checks its signer, recipient, derived message ID and timestamp. It returns `OpenedRelay { wire, application }`.
 - `canonical_bytes(&wire, decoded_content)` produces the signed bytes. It does not decode, normalize or reserialize content.
-- `derived_message_id(message_id)` hashes `tensamin-relay-message:v2` followed by the opaque ID's UTF-8 bytes and uses the first 16 digest bytes as a big-endian MTP MessageId.
+- `derived_message_id(message_id)` hashes `tensamin-relay-message\0` followed by the opaque ID's UTF-8 bytes and uses the first 16 digest bytes as a big-endian MTP MessageId. The outer signature domain is `tensamin-federated-relay\0`.
 
 Callers must authenticate signer key history and the encryption recipients before
 calling these functions. Supply the origin Iota, destination Iota, signing client
@@ -34,8 +34,8 @@ wire negotiation. Unknown or noncanonical versions fail.
 always builds and decodes the encrypted `ProtectedMessage` with this map, independently
 of the application's declared map. The compiled map `1.0` must contain the application
 communication type `ProtectedMessage` and MTP's reserved protected-envelope fields.
-The deployment map currently assigns `ProtectedMessage` ID 32. SecurePayload and
-VersionNumber must be available in the application's map for `into_frame`.
+The deployment map currently assigns `ProtectedMessage` ID 32. SecurePayload
+must be available in the application's map for `into_frame`.
 A build without the protected map fails when signing or verifying protected content.
 This contract does not infer a protected map from untrusted application version text.
 
@@ -138,7 +138,7 @@ Custom policies therefore need a sign/open compatibility check before deployment
 ## Chat identity
 
 `canonical_chat_id(&first, &second)` sorts principals by authority and numeric user ID,
-serializes the pair as compact JSON and returns `principal:v2:` followed by URL-safe
+serializes the pair as compact JSON and returns `principal:` followed by URL-safe
 base64 without padding. `canonical_chat_participants` returns the individual compact
 principal JSON strings in that same order. Use those strings for SetChatSecret's
 recipient UserId fields. `chat_secret_id(chat_id)` returns `chat:{chat_id}:main`.

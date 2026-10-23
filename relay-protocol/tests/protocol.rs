@@ -258,6 +258,7 @@ fn tampering_and_inner_outer_binding() {
 
 #[test]
 fn deterministic_canonical_and_chat_vectors() {
+    assert_eq!(SIGNING_DOMAIN, b"tensamin-federated-relay\0");
     let a = principal("a", 10);
     let b = principal("a", 2);
     assert_eq!(canonical_chat_id(&a, &b), canonical_chat_id(&b, &a));
@@ -270,11 +271,10 @@ fn deterministic_canonical_and_chat_vectors() {
     );
     assert_eq!(
         canonical_chat_id(&a, &b),
-        "principal:v2:W3siYXV0aG9yaXR5IjoiYSIsInVzZXJfaWQiOjJ9LHsiYXV0aG9yaXR5IjoiYSIsInVzZXJfaWQiOjEwfV0"
+        "principal:W3siYXV0aG9yaXR5IjoiYSIsInVzZXJfaWQiOjJ9LHsiYXV0aG9yaXR5IjoiYSIsInVzZXJfaWQiOjEwfV0"
     );
     assert_eq!(chat_secret_id("abc"), "chat:abc:main");
     let wire = RelayWire {
-        version: 2,
         signer: a,
         recipient: b,
         destination: "n".into(),
@@ -287,6 +287,9 @@ fn deterministic_canonical_and_chat_vectors() {
     let mut expected = SIGNING_DOMAIN.to_vec();
     expected.extend_from_slice(b"\0\0\0\x01a\0\0\0\0\0\0\0\x0a\0\0\0\x01a\0\0\0\0\0\0\0\x02\0\0\0\x01n\0\0\0\x01i\0\0\0\0\0\0\0\x03\0\0\0\x033.0\0\0\0\x02hi");
     assert_eq!(canonical_bytes(&wire, b"hi").unwrap(), expected);
-    assert_eq!(derived_message_id("opaque"), derived_message_id("opaque"));
+    assert_eq!(
+        derived_message_id("opaque"),
+        mtp::common::MessageId::new(0xf1eedb9110fcd8a36f573790b0db252f)
+    );
     assert_ne!(derived_message_id("opaque"), derived_message_id("other"));
 }
