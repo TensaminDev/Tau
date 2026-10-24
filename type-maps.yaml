@@ -196,6 +196,19 @@ type_maps:
       CallEnded: 222
       UserResolve: 223
       UserResolved: 224
+      RelayReceiptPage: 225
+      CallCommand: 226
+      CallCommandResult: 227
+      CallSnapshotGet: 228
+      CallSnapshot: 229
+      CallStateChanged: 230
+      CallJoinAuthorize: 231
+      CallJoinGrant: 232
+      CallKeyEnvelopeStage: 233
+      CallKeyEnvelopeGet: 234
+      CallKeyEnvelopeRevoke: 235
+      CallKeyEnvelopeActivate: 236
+      CallKeyEpochChanged: 237
 
     DataTypes:
       ErrorType: 32
@@ -398,8 +411,16 @@ type_maps:
       ProvisioningParticipantId: 241
       OpaqueMessage: 242
       EncryptedCredential: 243
+      CredentialFormatVersion: 244
       CallInviterId: 245
       UserAddress: 246
       AuthorityId: 247
       NodeId: 248
       SigningKeys: 249
+      ReceiptCursor: 250
+      ReceiptUpper: 251
+      ReceiptMore: 252
+      ReceiptComplete: 253
+      ReceiptSequence: 254
+      ReceiptAcceptedAt: 255
+      CallPayload: 256

@@ -10,7 +10,39 @@ registry. Its lifecycle state describes one connection. Reconnect replacement
 and stale-disconnect protection require an application-owned registry.
 
 Tau does not implement handshakes, key lookup, registration, task supervision,
-connection permits, authorization, federation, Community permissions or routing.
+connection permits, connection authorization, federation, Community permissions or routing.
+Its separate `tau::calls` module owns call-domain authorization after the host
+has resolved an authenticated actor.
+
+## Call management
+
+`tau::calls::CallManagement` is the shared execute, snapshot, and join-authorization
+interface. `CallEngine` coordinates the host repository, media controller, event
+publisher, ciphertext directory, and authoritative clock. SQL and provider SDKs
+remain outside Tau.
+
+`transition` is deterministic for the aggregate, verified actor, typed request,
+and host time. The repository commits its aggregate, audit, revisioned events,
+durable operation result, and effects in one transaction. It checks operation-ID
+replays before current membership or revision, and rejects conflicting content.
+Hosts must construct one engine per authoritative writer and route every call
+mutation through it. Admission roles are independent of mutable call roles.
+
+Microphone restrictions and server deafen are independent. Server deafen denies
+all media reception and microphone publication, not audio-only reception. Clearing
+a restriction restores permission; it never starts capture or remotely unmutes.
+Provider capability errors and pending enforcement remain explicit.
+
+Snapshots include a canonical roster, requester permissions and restrictions,
+visible invitations, lifecycle, revision, and separate key-availability and
+installation generations. Key-envelope reads use `authorize_envelope_read`,
+which is stricter than snapshot visibility. Ciphertext availability does not prove
+that a client installed the epoch.
+
+`calls::conformance::call_management_conformance` accepts an async fixture factory.
+It runs the same interface checks against the reference in-memory backend and
+Omikron's SQLite backend. Future Iota hosting can supply its own factory without
+duplicating policy. Iota-hosted authority execution is not implemented here.
 
 ## Admission
 

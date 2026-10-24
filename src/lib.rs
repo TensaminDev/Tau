@@ -1,7 +1,9 @@
-//! Post-handshake admission, session context, and shared protocol helpers.
+//! Post-handshake admission, session context, shared protocol helpers, and
+//! transport-neutral call management.
 //! The application owns the transport.
 mod admission;
 mod auth;
+pub mod calls;
 mod connection;
 mod error;
 mod framing;
