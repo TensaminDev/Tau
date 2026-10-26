@@ -22,6 +22,14 @@ pub const RELAY_ONLY_TYPES: &[CommunicationType] = &[
     CommunicationType::RemoveCommunity,
 ];
 
+/// These frames are never client operations, even when a caller includes them
+/// in a local request allowlist. Transport authentication remains mandatory.
+pub const CHAT_SECRET_PEER_CONTROL_TYPES: &[CommunicationType] = &[
+    CommunicationType::ChatSecretRecoveryRequest,
+    CommunicationType::ChatSecretRecoveryResponse,
+    CommunicationType::ChatSecretRecoveryUnavailable,
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessageSecurityClass {
     RelayOnly,
@@ -50,6 +58,8 @@ pub fn message_security_class_with(
         MessageSecurityClass::RelayOnly
     } else if peer_control_types.contains(&kind) {
         MessageSecurityClass::AuthenticatedPeerControl
+    } else if CHAT_SECRET_PEER_CONTROL_TYPES.contains(&kind) {
+        MessageSecurityClass::Unsupported
     } else if local_request_types.contains(&kind) {
         MessageSecurityClass::AuthenticatedLocalRequest
     } else {
@@ -103,5 +113,20 @@ mod tests {
             ),
             MessageSecurityClass::Unsupported
         );
+    }
+
+    #[test]
+    fn recovery_control_cannot_be_misclassified_as_a_local_client_request() {
+        for kind in super::CHAT_SECRET_PEER_CONTROL_TYPES {
+            let frame = CommunicationValue::new(*kind);
+            assert_eq!(
+                message_security_class_with(&frame, &[], &[*kind]),
+                MessageSecurityClass::Unsupported
+            );
+            assert_eq!(
+                message_security_class_with(&frame, &[*kind], &[]),
+                MessageSecurityClass::AuthenticatedPeerControl
+            );
+        }
     }
 }

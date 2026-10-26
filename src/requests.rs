@@ -73,6 +73,23 @@ impl ResponseExpectation {
     }
 }
 
+pub fn password_response_expectation(request: CommunicationType) -> Option<ResponseExpectation> {
+    use CommunicationType::*;
+    let success = match request {
+        PasswordEnrollmentStart => PasswordEnrollmentResponse,
+        PasswordEnrollmentFinish | PasswordEnrollmentDisable | PasswordEnrollmentStatus => {
+            PasswordEnrollmentStatus
+        }
+        PasswordProvisioningStart => PasswordProvisioningResponse,
+        PasswordProvisioningFinish => ProvisioningCredential,
+        _ => return None,
+    };
+    Some(ResponseExpectation {
+        allowed_success: vec![success],
+        allowed_errors: PROTOCOL_ERROR_TYPES.to_vec(),
+    })
+}
+
 #[derive(Debug, Clone)]
 pub enum RequestError {
     Registration(CorrelationError),
@@ -432,6 +449,51 @@ mod tests {
 
     fn frame() -> CommunicationValue {
         CommunicationValue::new(CommunicationType::Success)
+    }
+
+    #[test]
+    fn password_contracts_correlate_only_the_expected_response() {
+        use CommunicationType::*;
+        for (request, success) in [
+            (PasswordEnrollmentStart, PasswordEnrollmentResponse),
+            (PasswordEnrollmentFinish, PasswordEnrollmentStatus),
+            (PasswordEnrollmentDisable, PasswordEnrollmentStatus),
+            (PasswordEnrollmentStatus, PasswordEnrollmentStatus),
+            (PasswordProvisioningStart, PasswordProvisioningResponse),
+            (PasswordProvisioningFinish, ProvisioningCredential),
+        ] {
+            let expectation = password_response_expectation(request).unwrap();
+            assert!(!expectation.accepts(&frame()));
+            assert!(
+                !expectation.accepts(&CommunicationValue::new(request).with_id(1))
+                    || request == PasswordEnrollmentStatus
+            );
+            for &error in PROTOCOL_ERROR_TYPES {
+                let correlator = ResponseCorrelator::new();
+                let pending = correlator
+                    .reserve_checked(|_| true, expectation.clone())
+                    .unwrap();
+                assert!(!correlator.complete(pending.id() + 1, CommunicationValue::new(success)));
+                assert!(!correlator.complete(pending.id(), frame()));
+                assert!(correlator.complete(pending.id(), CommunicationValue::new(error)));
+            }
+            for expire in [false, true] {
+                let correlator = ResponseCorrelator::new();
+                let old = correlator
+                    .reserve_checked(|_| true, expectation.clone())
+                    .unwrap();
+                let old_id = old.id();
+                if expire {
+                    correlator.retain_fresh(Duration::ZERO);
+                }
+                drop(old);
+                let pending = correlator
+                    .reserve_checked(|_| true, expectation.clone())
+                    .unwrap();
+                assert!(!correlator.complete(old_id, CommunicationValue::new(success)));
+                assert!(correlator.complete(pending.id(), CommunicationValue::new(success)));
+            }
+        }
     }
 
     #[test]

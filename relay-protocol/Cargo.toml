@@ -21,3 +21,8 @@ thiserror = "2"
 wasm-bindgen = { version = "0.2", optional = true }
 mtp-crypto = { git = "https://github.com/Nonanium/MTP.git", rev = "9f7f94e4cbd227610784ae47a1e7a1acf66f8584", features = ["wasm"], optional = true }
 getrandom = { version = "0.2", features = ["js"], optional = true }
+
+[patch."https://github.com/Nonanium/MTP.git"]
+mtp = { path = "../../mtp" }
+mtp-type-map = { path = "../../mtp/type-map" }
+mtp-crypto = { path = "../../mtp/crypto" }

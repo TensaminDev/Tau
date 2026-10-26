@@ -209,6 +209,9 @@ type_maps:
       CallKeyEnvelopeRevoke: 235
       CallKeyEnvelopeActivate: 236
       CallKeyEpochChanged: 237
+      ChatSecretRecoveryRequest: 238
+      ChatSecretRecoveryResponse: 239
+      ChatSecretRecoveryUnavailable: 240
 
     DataTypes:
       ErrorType: 32

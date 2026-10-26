@@ -4,6 +4,7 @@
 mod admission;
 mod auth;
 pub mod calls;
+pub mod chat_secret_recovery;
 mod connection;
 mod error;
 mod framing;
@@ -34,9 +35,9 @@ pub use mtp_compat::{
 };
 pub use requests::{
     CorrelationError, PROTOCOL_ERROR_TYPES, PendingResponse, RequestError, ResponseCorrelator,
-    ResponseExpectation, is_protocol_error,
+    ResponseExpectation, is_protocol_error, password_response_expectation,
 };
 pub use role::{AuthenticationRequirement, RoleRule, RoleRules};
 pub use route::RouteTarget;
-pub use security::{MessageSecurityClass, RELAY_ONLY_TYPES, message_security_class_with};
+pub use security::{CHAT_SECRET_PEER_CONTROL_TYPES, MessageSecurityClass, RELAY_ONLY_TYPES, message_security_class_with};
 pub use session::{Session, SessionOutcome, VerifiedApplicationAuthentication};
