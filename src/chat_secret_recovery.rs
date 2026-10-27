@@ -1,5 +1,5 @@
 //! Versioned peer control, never a user relay or a replacement key proposal.
-use mtp::codec::{CommunicationType, CommunicationValue, DataType, DataValue};
+use mtp::codec::{CommunicationType, CommunicationValue, DataType, DataValue, TypeMap};
 use serde::{Deserialize, Serialize};
 
 // JSON byte vectors have overhead; this also accommodates a post-quantum signed
@@ -7,65 +7,7 @@ use serde::{Deserialize, Serialize};
 pub const MAX_RECOVERY_BYTES: usize = 2 * 1024 * 1024;
 pub const RECOVERY_VERSION: u16 = 1;
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Principal {
-    pub authority: String,
-    pub user_id: u64,
-}
-
-impl Principal {
-    pub fn validate(&self) -> Result<(), RecoveryError> {
-        if self.authority.is_empty() || self.authority.len() > 256 || self.user_id == 0 {
-            return Err(RecoveryError::Unauthorized);
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ConversationPair {
-    pub first: Principal,
-    pub second: Principal,
-}
-
-impl ConversationPair {
-    pub fn new(a: Principal, b: Principal) -> Result<Self, RecoveryError> {
-        let pair = if a < b {
-            Self {
-                first: a,
-                second: b,
-            }
-        } else {
-            Self {
-                first: b,
-                second: a,
-            }
-        };
-        pair.validate()?;
-        Ok(pair)
-    }
-
-    pub fn validate(&self) -> Result<(), RecoveryError> {
-        self.first.validate()?;
-        self.second.validate()?;
-        if self.first >= self.second {
-            return Err(RecoveryError::Unauthorized);
-        }
-        Ok(())
-    }
-
-    pub fn partner(&self, owner: &Principal) -> Result<&Principal, RecoveryError> {
-        if owner == &self.first {
-            Ok(&self.second)
-        } else if owner == &self.second {
-            Ok(&self.first)
-        } else {
-            Err(RecoveryError::Unauthorized)
-        }
-    }
-}
+pub use tau_relay_protocol::{ConversationPair, Principal};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -115,12 +57,25 @@ pub struct RecoveredEnvelope {
     pub operation_digest: String,
     pub original_operation: Vec<u8>,
     pub original_type_map_version: String,
+    pub original_type_map_fingerprint: String,
     pub recipient_envelope: Vec<u8>,
     pub provenance: Vec<u8>,
 }
 
 impl RecoveredEnvelope {
     pub fn validate(&self) -> Result<(), RecoveryError> {
+        let pair = ConversationPair::from_chat_id(&self.original_chat_id)
+            .map_err(|_| RecoveryError::Conflict)?;
+        if self.original_secret_id != tau_relay_protocol::chat_secret_id(&pair.chat_id()?) {
+            return Err(RecoveryError::Conflict);
+        }
+        if tau_relay_protocol::dictionary_fingerprint(&self.original_type_map_version)
+            .ok()
+            .as_deref()
+            != Some(self.original_type_map_fingerprint.as_str())
+        {
+            return Err(RecoveryError::Conflict);
+        }
         if self.epoch <= 0
             || self.original_chat_id.is_empty()
             || self.original_secret_id.is_empty()
@@ -129,9 +84,13 @@ impl RecoveredEnvelope {
             || self.namespace.is_empty()
             || self.namespace.len() > 2048
             || self.original_type_map_version.len() > 11
-            || mtp::type_map::Version::parse(&self.original_type_map_version).is_none()
+            || !mtp::type_map::Version::parse(&self.original_type_map_version)
+                .is_some_and(|version| version.to_string() == self.original_type_map_version)
             || self.operation_digest.len() != 64
-            || !self.operation_digest.bytes().all(|b| b.is_ascii_hexdigit())
+            || !self
+                .operation_digest
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
             || self.original_operation.is_empty()
             || self.recipient_envelope.is_empty()
             || self.original_operation.len() + self.recipient_envelope.len() + self.provenance.len()
@@ -158,6 +117,12 @@ pub enum RecoveryError {
     RetryablePeerUnavailable,
 }
 
+impl From<tau_relay_protocol::Error> for RecoveryError {
+    fn from(_: tau_relay_protocol::Error) -> Self {
+        Self::Unauthorized
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecoveryReply {
@@ -166,8 +131,15 @@ pub struct RecoveryReply {
 }
 
 pub fn request_frame(request: &RecoveryRequest) -> Result<CommunicationValue, RecoveryError> {
+    request_frame_with_type_map(request, &TypeMap::new(mtp::type_map::Version(1, 0)))
+}
+
+pub fn request_frame_with_type_map(
+    request: &RecoveryRequest,
+    map: &TypeMap,
+) -> Result<CommunicationValue, RecoveryError> {
     request.validate()?;
-    encode(CommunicationType::ChatSecretRecoveryRequest, request)
+    encode(CommunicationType::ChatSecretRecoveryRequest, request, map)
 }
 
 pub fn decode_request(frame: &CommunicationValue) -> Result<RecoveryRequest, RecoveryError> {
@@ -186,19 +158,33 @@ pub fn reply_frame(
     reply.request.validate()?;
     if let Ok(envelope) = &reply.result {
         envelope.validate()?;
+        if envelope.original_chat_id != reply.request.pair.chat_id()?
+            || reply
+                .request
+                .epoch
+                .is_some_and(|epoch| epoch != envelope.epoch)
+        {
+            return Err(RecoveryError::Conflict);
+        }
     }
     let kind = if reply.result.is_ok() {
         CommunicationType::ChatSecretRecoveryResponse
     } else {
         CommunicationType::ChatSecretRecoveryUnavailable
     };
-    Ok(encode(kind, reply)?.with_id(request.id().ok_or(RecoveryError::Unauthorized)?))
+    Ok(encode(
+        kind,
+        reply,
+        request.type_map().ok_or(RecoveryError::Conflict)?,
+    )?
+    .with_id(request.id().ok_or(RecoveryError::Unauthorized)?))
 }
 
 pub fn decode_reply(
     frame: &CommunicationValue,
     request: &RecoveryRequest,
 ) -> Result<RecoveryReply, RecoveryError> {
+    request.validate()?;
     let success = frame.is_type(CommunicationType::ChatSecretRecoveryResponse);
     if !success && !frame.is_type(CommunicationType::ChatSecretRecoveryUnavailable) {
         return Err(RecoveryError::Unauthorized);
@@ -209,7 +195,9 @@ pub fn decode_reply(
     }
     if let Ok(envelope) = &reply.result {
         envelope.validate()?;
-        if request.epoch.is_some_and(|epoch| epoch != envelope.epoch) {
+        if request.epoch.is_some_and(|epoch| epoch != envelope.epoch)
+            || envelope.original_chat_id != request.pair.chat_id()?
+        {
             return Err(RecoveryError::Conflict);
         }
     }
@@ -219,18 +207,33 @@ pub fn decode_reply(
 fn encode(
     kind: CommunicationType,
     value: &impl Serialize,
+    map: &TypeMap,
 ) -> Result<CommunicationValue, RecoveryError> {
+    if kind.try_to_id(map).is_none() || DataType::Json.try_to_id(map).is_none() {
+        return Err(RecoveryError::Conflict);
+    }
     let bytes = serde_json::to_vec(value).map_err(|_| RecoveryError::Conflict)?;
     if bytes.len() > MAX_RECOVERY_BYTES {
         return Err(RecoveryError::Conflict);
     }
-    Ok(CommunicationValue::new(kind).add_typed_default(DataType::Json, DataValue::Bytes(bytes)))
+    Ok(CommunicationValue::new_with_type_map(kind, map)
+        .add_typed_default(DataType::Json, DataValue::Bytes(bytes)))
 }
 
 fn decode<T: serde::de::DeserializeOwned>(frame: &CommunicationValue) -> Result<T, RecoveryError> {
-    let field = frame
-        .get_data(DataType::Json)
+    let map = frame.type_map().ok_or(RecoveryError::Conflict)?;
+    let id = DataType::Json
+        .try_to_id(map)
         .ok_or(RecoveryError::Conflict)?;
+    let DataValue::Container(fields) = frame.payload() else {
+        return Err(RecoveryError::Conflict);
+    };
+    let [(key, field)] = fields.as_slice() else {
+        return Err(RecoveryError::Conflict);
+    };
+    if *key != id {
+        return Err(RecoveryError::Conflict);
+    }
     let bytes = field.as_bytes_slice().ok_or(RecoveryError::Conflict)?;
     if bytes.len() > MAX_RECOVERY_BYTES {
         return Err(RecoveryError::Conflict);
@@ -243,7 +246,7 @@ mod tests {
     use super::*;
     fn request() -> RecoveryRequest {
         let owner = Principal {
-            authority: "iota:a".into(),
+            authority: format!("omega-key:{}", "a".repeat(64)),
             user_id: 1,
         };
         RecoveryRequest {
@@ -251,7 +254,7 @@ mod tests {
             pair: ConversationPair::new(
                 owner.clone(),
                 Principal {
-                    authority: "iota:b".into(),
+                    authority: format!("omega-key:{}", "b".repeat(64)),
                     user_id: 1,
                 },
             )
@@ -296,6 +299,41 @@ mod tests {
                 DataValue::Bytes(vec![b' '; MAX_RECOVERY_BYTES + 1]),
             );
         assert!(decode_reply(&frame, &request()).is_err());
+    }
+
+    #[test]
+    fn recovery_frames_reject_duplicate_extra_and_trailing_data() {
+        let request = request();
+        let frame = request_frame(&request).unwrap();
+        let mut fields = frame.payload().container_entries().unwrap().to_vec();
+        fields.push(fields[0].clone());
+        assert!(decode_request(&frame.clone().with_payload(DataValue::Container(fields))).is_err());
+        assert!(
+            decode_request(
+                &frame
+                    .clone()
+                    .add_typed_default(DataType::ChatId, DataValue::Str("1:2".into()))
+            )
+            .is_err()
+        );
+        let mut bytes = serde_json::to_vec(&request).unwrap();
+        bytes.extend_from_slice(b"{}");
+        assert!(
+            decode_request(
+                &frame
+                    .clone()
+                    .with_data(DataType::Json, DataValue::Bytes(bytes))
+            )
+            .is_err()
+        );
+        let json = serde_json::to_string(&request).unwrap();
+        let duplicate = json.replacen("\"version\":1", "\"version\":1,\"version\":1", 1);
+        assert!(
+            decode_request(
+                &frame.with_data(DataType::Json, DataValue::Bytes(duplicate.into_bytes()))
+            )
+            .is_err()
+        );
     }
 
     #[test]

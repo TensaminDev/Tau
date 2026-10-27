@@ -7,7 +7,7 @@ use tau_relay_protocol::*;
 
 fn principal(authority: &str, user_id: u64) -> Principal {
     Principal {
-        authority: authority.into(),
+        authority: format!("omega-key:{}", authority.repeat(64)),
         user_id,
     }
 }
@@ -21,6 +21,9 @@ fn wire() -> RelayWire {
         message_id: "opaque".into(),
         created_at: 0,
         type_map_version: "3.0".into(),
+        type_map_fingerprint: TypeMap::new(mtp::type_map::Version(3, 0))
+            .fingerprint_hex()
+            .unwrap(),
         content: STANDARD.encode([1, 2, 3]),
         signature: STANDARD.encode(vec![0; SigAlgorithm::length(SigAlgorithm::DUAL).unwrap()]),
     }
@@ -62,8 +65,8 @@ fn sign(application: CommunicationValue, sender: &Keyring, recipient: &Keyring) 
 // An invalid keyring is a sentinel proving that application decoding completed first.
 fn bridge_decode(application: &[u8], limits: &RelayProtocolLimits) -> Result<Vec<u8>, Error> {
     bridge::sign_protected_bytes_with_limits(
-        r#"{"authority":"a","user_id":1}"#,
-        r#"{"authority":"b","user_id":2}"#,
+        r#"{"authority":"omega-key:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","user_id":1}"#,
+        r#"{"authority":"omega-key:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","user_id":2}"#,
         &wire().destination,
         "opaque",
         42,
@@ -78,13 +81,12 @@ fn bridge_decode(application: &[u8], limits: &RelayProtocolLimits) -> Result<Vec
 #[test]
 fn public_wire_boundaries_include_serialized_bytes_and_json_structure() {
     let mut wire = wire();
-    wire.signer.authority = "é\"\\\n".into();
     wire.message_id = "[{},\"escaped\"]".into();
     let json = serde_json::to_vec(&wire).unwrap();
     let limits = RelayProtocolLimits {
         max_wire_bytes: json.len(),
         max_depth: 2,
-        max_fields: 25,
+        max_fields: 27,
         ..RelayProtocolLimits::default()
     };
     wire.validate_with_limits(&limits).unwrap();
@@ -106,14 +108,14 @@ fn public_wire_boundaries_include_serialized_bytes_and_json_structure() {
             ..limits
         },
         RelayProtocolLimits {
-            max_fields: 24,
+            max_fields: 26,
             ..limits
         },
     ] {
         let (field, actual, max) = if limits.max_depth == 1 {
             ("JSON depth", 2, 1)
-        } else if limits.max_fields == 24 {
-            ("JSON fields", 25, 24)
+        } else if limits.max_fields == 26 {
+            ("JSON fields", 27, 26)
         } else {
             ("JSON bytes", json.len(), json.len() - 1)
         };
@@ -145,11 +147,9 @@ fn public_wire_boundaries_include_serialized_bytes_and_json_structure() {
 #[test]
 fn principal_and_identity_limits_measure_utf8_bytes() {
     let mut wire = wire();
-    wire.signer.authority = "é".repeat(4);
-    wire.recipient.authority = "ø".repeat(4);
     wire.message_id = "💬💬".into();
     let limits = RelayProtocolLimits {
-        max_authority_bytes: 8,
+        max_authority_bytes: wire.signer.authority.len(),
         max_message_id_bytes: 8,
         max_destination_bytes: wire.destination.len(),
         max_type_map_version_bytes: 3,
@@ -167,11 +167,11 @@ fn principal_and_identity_limits_measure_utf8_bytes() {
         let (label, max) = match field {
             "signer" => {
                 changed.signer.authority.push('x');
-                ("authority bytes", 8)
+                ("authority bytes", limits.max_authority_bytes)
             }
             "recipient" => {
                 changed.recipient.authority.push('x');
-                ("authority bytes", 8)
+                ("authority bytes", limits.max_authority_bytes)
             }
             "message_id" => {
                 changed.message_id.push('x');
@@ -187,12 +187,13 @@ fn principal_and_identity_limits_measure_utf8_bytes() {
             }
         };
         limit(changed.validate_with_limits(&limits), label, max + 1, max);
-        limit(
-            RelayWire::from_json_with_limits(&serde_json::to_vec(&changed).unwrap(), &limits),
-            label,
-            max + 1,
-            max,
-        );
+        let decoded =
+            RelayWire::from_json_with_limits(&serde_json::to_vec(&changed).unwrap(), &limits);
+        if field == "signer" || field == "recipient" {
+            assert!(decoded.is_err());
+        } else {
+            limit(decoded, label, max + 1, max);
+        }
         limit(
             canonical_bytes_with_limits(&changed, b"", &limits),
             label,
@@ -373,16 +374,14 @@ fn preflight_limits_win_over_json_deserialization_and_crypto() {
     );
     let mut changed = wire();
     changed.signer.authority = "x".repeat(1025);
-    limit(
+    assert!(
         verify_outer(
             &serde_json::to_vec(&changed).unwrap(),
             &[sender.public_key_bundle()],
             None,
             None,
-        ),
-        "authority bytes",
-        1025,
-        1024,
+        )
+        .is_err()
     );
 }
 
@@ -510,7 +509,7 @@ fn bridge_principal_limits_apply_after_json_unescaping_before_key_parsing() {
         assert!(matches!(
             bridge::sign_protected_bytes_with_limits(
                 signer,
-                r#"{"authority":"b","user_id":2}"#,
+                r#"{"authority":"omega-key:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","user_id":2}"#,
                 &destination,
                 "x",
                 0,
@@ -520,7 +519,7 @@ fn bridge_principal_limits_apply_after_json_unescaping_before_key_parsing() {
                 "[]",
                 &limits,
             ),
-            Err(Error::Invalid("raw key layout"))
+            Err(Error::Json(_))
         ));
     }
     for (signer, recipient) in [
@@ -533,7 +532,7 @@ fn bridge_principal_limits_apply_after_json_unescaping_before_key_parsing() {
             r#"{"authority":"\u00e9x","user_id":2}"#,
         ),
     ] {
-        limit(
+        assert!(matches!(
             bridge::sign_protected_bytes_with_limits(
                 signer,
                 recipient,
@@ -546,10 +545,8 @@ fn bridge_principal_limits_apply_after_json_unescaping_before_key_parsing() {
                 "[]",
                 &limits,
             ),
-            "authority bytes",
-            3,
-            2,
-        );
+            Err(Error::Json(_))
+        ));
     }
     for (destination, message_id, version, label, actual, max) in [
         (
@@ -707,7 +704,7 @@ fn real_crypto_roundtrip_obeys_wire_protected_application_and_key_counts() {
             &json,
             &key_json,
             &recipient.try_to_bytes().unwrap(),
-            r#"{"authority":"b","user_id":2}"#,
+            r#"{"authority":"omega-key:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","user_id":2}"#,
             &wire.destination,
             &limits
         )
@@ -776,7 +773,7 @@ fn real_crypto_roundtrip_obeys_wire_protected_application_and_key_counts() {
             &json,
             &two,
             &[],
-            r#"{"authority":"b","user_id":2}"#,
+            r#"{"authority":"omega-key:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","user_id":2}"#,
             &wire.destination,
             &limits,
         ),
@@ -834,6 +831,11 @@ fn signed_declared_application_map_never_falls_back_to_latest() {
     let recipient = Keyring::generate();
     let mut wire = sign(app(DataValue::Null), &sender, &recipient);
     wire.type_map_version = "1.0".into();
+    assert!(
+        wire.validate().is_err(),
+        "a version label cannot substitute another dictionary"
+    );
+    wire.type_map_fingerprint = dictionary_fingerprint("1.0").unwrap();
     let signing = DualSigner::new(
         &sender.sig_cl_secret_key,
         &sender.sig_pq_secret_key,

@@ -519,7 +519,7 @@ dependencies = [
  "curve25519-dalek 5.0.0",
  "ed25519",
  "serde",
- "sha2",
+ "sha2 0.11.1",
  "signature",
  "subtle",
  "zeroize",
@@ -1305,6 +1305,7 @@ dependencies = [
 [[package]]
 name = "mtp"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "mtp-client",
  "mtp-codec",
@@ -1321,6 +1322,7 @@ dependencies = [
 [[package]]
 name = "mtp-client"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "mtp-codec",
  "mtp-common",
@@ -1333,6 +1335,7 @@ dependencies = [
 [[package]]
 name = "mtp-codec"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "base64 0.23.1",
  "byteorder",
@@ -1346,6 +1349,7 @@ dependencies = [
 [[package]]
 name = "mtp-common"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "js-sys",
  "rand",
@@ -1355,6 +1359,7 @@ dependencies = [
 [[package]]
 name = "mtp-core"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "async-trait",
  "mtp-codec",
@@ -1368,6 +1373,7 @@ dependencies = [
 [[package]]
 name = "mtp-crypto"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
@@ -1380,7 +1386,7 @@ dependencies = [
  "rand_core 0.6.4",
  "rustls",
  "serde",
- "sha2",
+ "sha2 0.11.1",
  "thiserror 1.0.69",
  "tokio",
  "zeroize",
@@ -1389,6 +1395,7 @@ dependencies = [
 [[package]]
 name = "mtp-h3"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1405,6 +1412,7 @@ dependencies = [
 [[package]]
 name = "mtp-host"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "mtp-codec",
  "mtp-common",
@@ -1420,6 +1428,7 @@ dependencies = [
 [[package]]
 name = "mtp-native"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "async-trait",
  "mtp-codec",
@@ -1429,7 +1438,7 @@ dependencies = [
  "rcgen",
  "rustls",
  "rustls-native-certs",
- "sha2",
+ "sha2 0.11.1",
  "tokio",
  "tracing",
  "wtransport",
@@ -1439,6 +1448,7 @@ dependencies = [
 [[package]]
 name = "mtp-pipes"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "mtp-codec",
  "mtp-common",
@@ -1454,14 +1464,17 @@ dependencies = [
 [[package]]
 name = "mtp-type-map"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "serde",
  "serde-saphyr",
+ "sha2 0.10.9",
 ]
 
 [[package]]
 name = "mtp-webserver"
 version = "0.4.0"
+source = "git+https://github.com/Nonanium/MTP.git?rev=db3125809293e462ec1593704e9c4d2172437533#db3125809293e462ec1593704e9c4d2172437533"
 dependencies = [
  "bytes",
  "h3",
@@ -2058,6 +2071,17 @@ dependencies = [
 
 [[package]]
 name = "sha2"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.2.17",
+ "digest 0.10.7",
+]
+
+[[package]]
+name = "sha2"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
@@ -2234,16 +2258,30 @@ dependencies = [
 name = "tau"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "dashmap",
  "libc",
  "mtp",
  "rcgen",
  "serde",
  "serde_json",
+ "tau-relay-protocol",
  "thiserror 2.0.21",
  "tokio",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "tau-relay-protocol"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "mtp",
+ "mtp-type-map",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -2744,7 +2782,7 @@ dependencies = [
  "rustls",
  "rustls-native-certs",
  "rustls-pki-types",
- "sha2",
+ "sha2 0.11.1",
  "socket2",
  "thiserror 2.0.21",
  "time",

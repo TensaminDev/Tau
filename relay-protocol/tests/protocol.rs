@@ -7,7 +7,7 @@ use tau_relay_protocol::*;
 
 fn principal(authority: &str, user_id: u64) -> Principal {
     Principal {
-        authority: authority.into(),
+        authority: format!("omega-key:{}", authority.repeat(64)),
         user_id,
     }
 }
@@ -51,8 +51,8 @@ fn confidential_roundtrip_and_browser_boundary() {
         Keyring::generate(),
         Keyring::generate(),
     ];
-    let signer = principal("authority:a", 7);
-    let recipient = principal("authority:b", 7);
+    let signer = principal("a", 7);
+    let recipient = principal("b", 7);
     let app = application();
     let keys = recipients.iter().map(Keyring::public_key_bundle).collect();
     let wire = sign_protected(
@@ -265,13 +265,17 @@ fn deterministic_canonical_and_chat_vectors() {
     assert_eq!(
         canonical_chat_participants(&a, &b),
         [
-            r#"{"authority":"a","user_id":2}"#,
-            r#"{"authority":"a","user_id":10}"#
+            r#"{"authority":"omega-key:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","user_id":2}"#,
+            r#"{"authority":"omega-key:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","user_id":10}"#
         ]
     );
     assert_eq!(
+        ConversationPair::from_chat_id(&canonical_chat_id(&a, &b)).unwrap(),
+        ConversationPair::new(a.clone(), b.clone()).unwrap()
+    );
+    assert_eq!(
         canonical_chat_id(&a, &b),
-        "principal:W3siYXV0aG9yaXR5IjoiYSIsInVzZXJfaWQiOjJ9LHsiYXV0aG9yaXR5IjoiYSIsInVzZXJfaWQiOjEwfV0"
+        "principal:W3siYXV0aG9yaXR5Ijoib21lZ2Eta2V5OmFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiLCJ1c2VyX2lkIjoyfSx7ImF1dGhvcml0eSI6Im9tZWdhLWtleTphYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwidXNlcl9pZCI6MTB9XQ"
     );
     assert_eq!(chat_secret_id("abc"), "chat:abc:main");
     let wire = RelayWire {
@@ -281,11 +285,16 @@ fn deterministic_canonical_and_chat_vectors() {
         message_id: "i".into(),
         created_at: 3,
         type_map_version: "3.0".into(),
+        type_map_fingerprint: TypeMap::new(mtp::type_map::Version(3, 0))
+            .fingerprint_hex()
+            .unwrap(),
         content: String::new(),
         signature: String::new(),
     };
     let mut expected = SIGNING_DOMAIN.to_vec();
-    expected.extend_from_slice(b"\0\0\0\x01a\0\0\0\0\0\0\0\x0a\0\0\0\x01a\0\0\0\0\0\0\0\x02\0\0\0\x01n\0\0\0\x01i\0\0\0\0\0\0\0\x03\0\0\0\x033.0\0\0\0\x02hi");
+    expected.extend_from_slice(b"\0\0\0\x4aomega-key:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0\0\0\0\0\0\0\x0a\0\0\0\x4aomega-key:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\0\0\0\0\0\0\0\x02\0\0\0\x01n\0\0\0\x01i\0\0\0\0\0\0\0\x03\0\0\0\x033.0\0\0\0\x40");
+    expected.extend_from_slice(wire.type_map_fingerprint.as_bytes());
+    expected.extend_from_slice(b"\0\0\0\x02hi");
     assert_eq!(canonical_bytes(&wire, b"hi").unwrap(), expected);
     assert_eq!(
         derived_message_id("opaque"),

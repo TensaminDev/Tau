@@ -392,11 +392,20 @@ impl ResponseCorrelator {
         Fut: Future<Output = Result<(), E>>,
         E: Into<Box<dyn Error + Send + Sync>>,
     {
+        let map = request
+            .type_map()
+            .cloned()
+            .filter(|map| map.fingerprint().is_some())
+            .ok_or(RequestError::UnexpectedResponse)?;
         let (tx, mut rx) = oneshot::channel();
         let pending = self.insert(
             None,
             Box::new(move |result| tx.send(result).is_ok()),
-            Some(std::sync::Arc::new(validate)),
+            Some(std::sync::Arc::new(move |response| {
+                response.type_map().is_some_and(|selected| {
+                    selected.version == map.version && selected.fingerprint() == map.fingerprint()
+                }) && validate(response)
+            })),
         )?;
         let response = tokio::time::timeout(timeout, async {
             // Local closure/cancellation must also interrupt a blocked send.

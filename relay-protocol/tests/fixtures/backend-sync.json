@@ -1,0 +1,22 @@
+{
+  "dictionary_version": "1.0",
+  "dictionary_fingerprint": "02af6e65ae31d7c2f7d30414b7917e3637705871a8574dfeee834ebd81122450",
+  "schema": "tensamin-account-sync:v1",
+  "request_id": 42,
+  "request": {
+    "operation": "snapshot",
+    "scope": {
+      "principal": {
+        "authority": "omega-key:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "user_id": 42
+      },
+      "device_id": "fixture-device",
+      "authorization_generation": 1,
+      "schema": "tensamin-account-sync:v1",
+      "dictionary": "02af6e65ae31d7c2f7d30414b7917e3637705871a8574dfeee834ebd81122450"
+    },
+    "page": null,
+    "limit": 128
+  },
+  "request_mtp_base64": "AAABbQCyAQAAACoJAAEA3AcAAAFceyJvcGVyYXRpb24iOiJzbmFwc2hvdCIsInNjb3BlIjp7InByaW5jaXBhbCI6eyJhdXRob3JpdHkiOiJvbWVnYS1rZXk6YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsInVzZXJfaWQiOjQyfSwiZGV2aWNlX2lkIjoiZml4dHVyZS1kZXZpY2UiLCJhdXRob3JpemF0aW9uX2dlbmVyYXRpb24iOjEsInNjaGVtYSI6InRlbnNhbWluLWFjY291bnQtc3luYzp2MSIsImRpY3Rpb25hcnkiOiIwMmFmNmU2NWFlMzFkN2MyZjdkMzA0MTRiNzkxN2UzNjM3NzA1ODcxYTg1NzRkZmVlZTgzNGViZDgxMTIyNDUwIn0sInBhZ2UiOm51bGwsImxpbWl0IjoxMjh9"
+}

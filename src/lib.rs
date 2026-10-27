@@ -4,7 +4,11 @@
 mod admission;
 mod auth;
 pub mod calls;
+pub mod chat_secret;
 pub mod chat_secret_recovery;
+pub mod password;
+pub mod sync;
+pub use tau_relay_protocol as relay_protocol;
 mod connection;
 mod error;
 mod framing;
@@ -39,5 +43,8 @@ pub use requests::{
 };
 pub use role::{AuthenticationRequirement, RoleRule, RoleRules};
 pub use route::RouteTarget;
-pub use security::{CHAT_SECRET_PEER_CONTROL_TYPES, MessageSecurityClass, RELAY_ONLY_TYPES, message_security_class_with};
+pub use security::{
+    CHAT_SECRET_PEER_CONTROL_TYPES, MessageSecurityClass, RELAY_ONLY_TYPES,
+    message_security_class_with,
+};
 pub use session::{Session, SessionOutcome, VerifiedApplicationAuthentication};

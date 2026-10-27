@@ -1,9 +1,6 @@
 //! Transport-neutral federation relay. Identity resolution and durable replay belong to callers.
 
-use base64::{
-    Engine as _,
-    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
-};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use mtp::codec::{
     CommunicationType, CommunicationValue, DataType, DataValue, ProtectedMessageBuilder,
     ProtectedOpenOptions, ProtectionPolicy, ProtectionPurpose, TypeMap,
@@ -25,12 +22,12 @@ mod limits;
 pub use limits::RelayProtocolLimits;
 use limits::{bound, decode_base64, json_bytes, preflight_json};
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Principal {
-    pub authority: String,
-    pub user_id: u64,
-}
+mod principal;
+pub use principal::{ConversationPair, Principal};
+pub mod application;
+mod native;
+pub mod sync;
+pub use native::{NativeRelayRoute, unverified_native_route};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -41,6 +38,7 @@ pub struct RelayWire {
     pub message_id: String,
     pub created_at: u64,
     pub type_map_version: String,
+    pub type_map_fingerprint: String,
     pub content: String,
     pub signature: String,
 }
@@ -122,9 +120,9 @@ impl RelayWire {
         {
             return Err(Error::Invalid("dual signature length"));
         }
-        // RelayWire's fixed schema has two object levels and 25 JSON value/key tokens.
+        // RelayWire's fixed schema has two object levels and 27 JSON value/key tokens.
         bound("JSON depth", 2, limits.max_depth)?;
-        bound("JSON fields", 25, limits.max_fields)?;
+        bound("JSON fields", 27, limits.max_fields)?;
         limits::json_size(self, limits.max_wire_bytes)
     }
 
@@ -170,6 +168,12 @@ fn parse_map(version: &str) -> Result<TypeMap, Error> {
     Ok(map)
 }
 
+pub fn dictionary_fingerprint(version: &str) -> Result<String, Error> {
+    parse_map(version)?
+        .fingerprint_hex()
+        .ok_or(Error::Invalid("unknown application dictionary"))
+}
+
 fn protected_type() -> Result<CommunicationType, Error> {
     CommunicationType::from_name("ProtectedMessage")
         .ok_or(Error::Invalid("type map lacks ProtectedMessage"))
@@ -212,15 +216,27 @@ fn validate_lengths(wire: &RelayWire, limits: &RelayProtocolLimits) -> Result<()
 fn validate(wire: &RelayWire, limits: &RelayProtocolLimits) -> Result<(), Error> {
     validate_lengths(wire, limits)?;
     for principal in [&wire.signer, &wire.recipient] {
-        if principal.authority.trim().is_empty() {
-            return Err(Error::Invalid("authority"));
-        }
+        principal.validate()?;
     }
     if wire.signer == wire.recipient {
         return Err(Error::Invalid("identical principals"));
     }
-    let fingerprint = wire
-        .destination
+    validate_destination(&wire.destination)?;
+    if wire.message_id.is_empty() {
+        return Err(Error::Invalid("message ID"));
+    }
+    if parse_map(&wire.type_map_version)?
+        .fingerprint_hex()
+        .as_deref()
+        != Some(wire.type_map_fingerprint.as_str())
+    {
+        return Err(Error::Invalid("application dictionary fingerprint"));
+    }
+    Ok(())
+}
+
+fn validate_destination(destination: &str) -> Result<(), Error> {
+    let fingerprint = destination
         .strip_prefix("iota:v1:")
         .ok_or(Error::Invalid("destination"))?;
     if fingerprint.len() != 64
@@ -230,10 +246,6 @@ fn validate(wire: &RelayWire, limits: &RelayProtocolLimits) -> Result<(), Error>
     {
         return Err(Error::Invalid("noncanonical destination"));
     }
-    if wire.message_id.is_empty() {
-        return Err(Error::Invalid("message ID"));
-    }
-    parse_map(&wire.type_map_version)?;
     Ok(())
 }
 
@@ -258,6 +270,7 @@ pub fn canonical_bytes_with_limits(
     push(&mut bytes, wire.message_id.as_bytes())?;
     bytes.extend_from_slice(&wire.created_at.to_be_bytes());
     push(&mut bytes, wire.type_map_version.as_bytes())?;
+    push(&mut bytes, wire.type_map_fingerprint.as_bytes())?;
     push(&mut bytes, content)?;
     Ok(bytes)
 }
@@ -337,6 +350,9 @@ pub fn sign_protected_with_limits(
         message_id,
         created_at,
         type_map_version: map.version.to_string(),
+        type_map_fingerprint: map
+            .fingerprint_hex()
+            .ok_or(Error::Invalid("unknown application dictionary"))?,
         content: String::new(),
         signature: String::new(),
     };
@@ -583,11 +599,7 @@ fn sorted_pair<'a>(first: &'a Principal, second: &'a Principal) -> [&'a Principa
 }
 
 pub fn canonical_chat_id(first: &Principal, second: &Principal) -> String {
-    format!(
-        "principal:{}",
-        URL_SAFE_NO_PAD
-            .encode(serde_json::to_vec(&sorted_pair(first, second)).expect("principal JSON"))
-    )
+    principal::encode_chat_id(sorted_pair(first, second))
 }
 
 pub fn chat_secret_id(chat_id: &str) -> String {
