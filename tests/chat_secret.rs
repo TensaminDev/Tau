@@ -1,5 +1,5 @@
 use mtp::codec::{CommunicationType, DataType, DataValue, TypeMap};
-use tau::chat_secret::{ReadRequest, ReadUnavailable, SecretEpoch};
+use tau::chat_secret::{ReadRequest, ReadResponse, ReadUnavailable, SecretEpoch};
 use tau::relay_protocol::{ConversationPair, Principal, chat_secret_id};
 
 fn request() -> ReadRequest {
@@ -23,6 +23,74 @@ fn latest_and_named_epoch_reads_round_trip_with_canonical_scope() {
         let frame = request.to_frame(&map, 42).unwrap();
         assert_eq!(ReadRequest::from_frame(&frame).unwrap(), request);
         assert_eq!(frame.type_map(), Some(&map));
+    }
+}
+
+#[test]
+fn committed_envelopes_round_trip_and_bind_owner_epoch_routing_and_correlation() {
+    let map = TypeMap::new(mtp::type_map::Version(1, 0));
+    for requested_epoch in [None, Some(SecretEpoch::try_from(3).unwrap())] {
+        let mut scope = request();
+        scope.epoch = requested_epoch;
+        let frame = scope.to_frame(&map, 42).unwrap().with_sender(7);
+        scope.epoch = Some(SecretEpoch::try_from(3).unwrap());
+        let response = ReadResponse {
+            scope,
+            encrypted_secret: vec![1, 2, 3],
+            kem_ciphertext: vec![4, 5, 6],
+            wrapping_scheme: "fixture-wrapping:v1".into(),
+            created_at: 10,
+            updated_at: 20,
+        };
+        let reply = response.to_frame(&frame).unwrap();
+        assert_eq!(ReadResponse::from_frame(&reply, &frame).unwrap(), response);
+        assert_eq!(reply.receiver(), Some(7));
+        for invalid in [
+            reply.clone().with_id(43),
+            reply.clone().with_receiver(8),
+            reply
+                .clone()
+                .with_data(DataType::UserId, DataValue::UnsignedNumber(42)),
+            reply
+                .clone()
+                .with_data(DataType::VersionNumber, DataValue::SignedNumber(0)),
+            reply
+                .clone()
+                .with_data(DataType::EncryptedSecret, DataValue::Bytes(vec![])),
+            reply
+                .clone()
+                .with_data(DataType::KemCiphertext, DataValue::Bytes(vec![])),
+            reply
+                .clone()
+                .with_data(DataType::WrappingScheme, DataValue::Str(" padded ".into())),
+            reply
+                .clone()
+                .with_data(DataType::UpdatedAt, DataValue::SignedNumber(9)),
+            reply
+                .clone()
+                .add_typed_default(DataType::Principal, DataValue::Str("extra".into())),
+        ] {
+            assert!(ReadResponse::from_frame(&invalid, &frame).is_err());
+        }
+        let mut fields = reply.payload().clone();
+        fields.container_entries_mut().unwrap().push((
+            DataType::EncryptedSecret.try_to_id(&map).unwrap(),
+            DataValue::Bytes(vec![7]),
+        ));
+        assert!(ReadResponse::from_frame(&reply.with_payload(fields), &frame).is_err());
+        let mut other_owner = response.clone();
+        other_owner.scope.owner = other_owner
+            .scope
+            .pair
+            .partner(&other_owner.scope.owner)
+            .unwrap()
+            .clone();
+        assert!(other_owner.to_frame(&frame).is_err());
+        if requested_epoch.is_some() {
+            let mut other_epoch = response.clone();
+            other_epoch.scope.epoch = Some(SecretEpoch::try_from(4).unwrap());
+            assert!(other_epoch.to_frame(&frame).is_err());
+        }
     }
 }
 
@@ -73,7 +141,7 @@ fn read_decoders_reject_aliases_extra_fields_and_invalid_epochs() {
 #[test]
 fn unavailable_states_are_exact_correlated_outcomes_not_generic_success() {
     let map = TypeMap::new(mtp::type_map::Version(1, 0));
-    let request = request().to_frame(&map, 42).unwrap();
+    let request = request().to_frame(&map, 42).unwrap().with_sender(7);
     for state in [
         ReadUnavailable::NoSuchConversation,
         ReadUnavailable::Pending,
@@ -90,6 +158,7 @@ fn unavailable_states_are_exact_correlated_outcomes_not_generic_success() {
         );
         assert!(!reply.is_type(CommunicationType::Success));
         assert!(ReadUnavailable::from_frame(&reply.clone().with_id(43), &request).is_err());
+        assert!(ReadUnavailable::from_frame(&reply.clone().with_receiver(8), &request).is_err());
         assert!(
             ReadUnavailable::from_frame(
                 &reply.with_data(DataType::ErrorType, DataValue::Str("other".into())),

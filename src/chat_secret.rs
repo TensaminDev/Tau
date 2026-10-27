@@ -131,6 +131,7 @@ impl ReadResponse {
     ) -> Result<Self, ReadCodecError> {
         if !frame.is_type(CommunicationType::ChatSecretResponse)
             || frame.id() != request.id()
+            || request.sender().is_some_and(|sender| frame.receiver() != Some(sender))
             || frame.type_map() != request.type_map()
         {
             return Err(ReadCodecError::Invalid(
@@ -263,7 +264,10 @@ impl ReadUnavailable {
         frame: &CommunicationValue,
         request: &CommunicationValue,
     ) -> Result<Self, ReadCodecError> {
-        if frame.id() != request.id() || frame.type_map() != request.type_map() {
+        if frame.id() != request.id()
+            || request.sender().is_some_and(|sender| frame.receiver() != Some(sender))
+            || frame.type_map() != request.type_map()
+        {
             return Err(ReadCodecError::Invalid(
                 "response correlation or dictionary",
             ));
