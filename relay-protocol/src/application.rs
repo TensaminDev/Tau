@@ -10,20 +10,21 @@ impl ApplicationOperation {
         let map = frame
             .type_map()
             .ok_or(crate::Error::Invalid("application dictionary"))?;
-        if map.version.to_string() != "1.0"
+        if !matches!(map.version.to_string().as_str(), "1.0" | "1.1")
             || map.fingerprint_hex().as_deref()
-                != Some(crate::dictionary_fingerprint("1.0")?.as_str())
+                != Some(crate::dictionary_fingerprint(&map.version.to_string())?.as_str())
         {
             return Err(crate::Error::Invalid("application dictionary"));
         }
         let allowed: &[&str] = match map.communication_type_name(frame.get_type().0) {
-            Some("MessageSend") => &["Content","SendTime","Height","VersionNumber","ReplyId"],
-            Some("MessageEdit") => &["Content","SendTime","VersionNumber"],
-            Some("MessageReactionAdd"|"MessageReactionRemove") => &["Reaction","SendTime"],
-            Some("MessageDelete"|"MessageDeleteLive") => &["SendTime"],
-            Some("MessageState") => &["ChatPartnerId","MessageState","RelayMessageId","EventAt"],
-            Some("SetChatSecret") => &["SecretId","VersionNumber","WrappingScheme","Recipients"],
-            Some("AddConversation") => &["ChatPartnerId","ChatPartnerName"],
+            Some("MessageSend") => &["Content", "SendTime", "Height", "VersionNumber", "ReplyId"],
+            Some("MessageEdit") => &["Content", "SendTime", "VersionNumber"],
+            Some("MessageReactionAdd" | "MessageReactionRemove") => &["Reaction", "SendTime"],
+            Some("MessageDelete" | "MessageDeleteLive") => &["SendTime"],
+            Some("MessageState") => &["ChatPartnerId", "MessageState", "RelayMessageId", "EventAt"],
+            Some("SetChatSecret") => &["SecretId", "VersionNumber", "WrappingScheme", "Recipients"],
+            Some("AddConversation") => &["ChatPartnerId", "ChatPartnerName"],
+            Some("FileShareOffered" | "FileShareRevoked") => &["Json"],
             _ => return Err(crate::Error::Invalid("application operation")),
         };
         let fields = frame
@@ -50,6 +51,12 @@ impl ApplicationOperation {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub enum ApplicationOperation {
+    FileShareOffered {
+        offer: crate::files::ShareOffer,
+    },
+    FileShareRevoked {
+        revoke: crate::files::ShareRevoke,
+    },
     MessageSend {
         content: String,
         send_time: i64,

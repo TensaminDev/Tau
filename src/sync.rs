@@ -8,7 +8,9 @@ pub fn encode_request(
     correlation_id: u32,
 ) -> Result<CommunicationValue, SyncError> {
     if !request.validate()
-        || map.fingerprint_hex().as_deref() != Some(request.scope().dictionary.as_str())
+        || !map
+            .fingerprint_hex()
+            .is_some_and(|hash| dictionaries_compatible(&hash, &request.scope().dictionary))
         || CommunicationType::AccountStateRequest
             .try_to_id(map)
             .is_none()
@@ -29,7 +31,7 @@ pub fn encode_request(
 
 pub fn decode_request(frame: &CommunicationValue) -> Result<Request, SyncError> {
     let map = frame.type_map().ok_or(SyncError::InvalidRequest)?;
-    if map.version.to_string() != "1.0"
+    if !matches!(map.version.to_string().as_str(), "1.0" | "1.1")
         || map.fingerprint().is_none()
         || !frame.is_type(CommunicationType::AccountStateRequest)
     {
@@ -46,7 +48,11 @@ pub fn decode_request(frame: &CommunicationValue) -> Result<Request, SyncError> 
         return Err(SyncError::InvalidRequest);
     }
     let request: Request = serde_json::from_slice(bytes).map_err(|_| SyncError::InvalidRequest)?;
-    if !request.validate() {
+    if !request.validate()
+        || !map
+            .fingerprint_hex()
+            .is_some_and(|hash| dictionaries_compatible(&hash, &request.scope().dictionary))
+    {
         return Err(SyncError::InvalidRequest);
     }
     Ok(request)

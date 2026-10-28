@@ -1,8 +1,8 @@
-protocol_version: "1.0"
+protocol_version: "1.1"
 
 type_maps:
   "1.0":
-    CommunicationTypes:
+    CommunicationTypes: &communication_v1
       ProtectedMessage: 32
       ErrorProtocol: 33
       ErrorAnonymous: 34
@@ -213,7 +213,7 @@ type_maps:
       ChatSecretRecoveryResponse: 239
       ChatSecretRecoveryUnavailable: 240
 
-    DataTypes:
+    DataTypes: &data_v1
       ErrorType: 32
       ErrorProtocol: 33
       AcceptedIds: 34
@@ -427,3 +427,27 @@ type_maps:
       ReceiptSequence: 254
       ReceiptAcceptedAt: 255
       CallPayload: 256
+
+  "1.1":
+    CommunicationTypes:
+      <<: *communication_v1
+      FileFolderPut: 241
+      FilePlacementPut: 242
+      FileVersionPublish: 243
+      FileListPage: 244
+      FileGetManifest: 245
+      FileDelete: 246
+      FileChangesGet: 247
+      FileReplicaAccept: 248
+      FileReplicaCancel: 249
+      FileShareOffered: 250
+      FileShareRevoked: 251
+      FileReplicaRead: 252
+      FileReplicaStatus: 253
+      FileFolderDelete: 254
+      FilePlacementDelete: 255
+      FileKeyEnvelopePut: 256
+      FileMetadataPut: 257
+      FileReplicaReadResponse: 258
+      FileUploadStart: 259
+    DataTypes: *data_v1

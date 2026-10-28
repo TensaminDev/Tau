@@ -25,6 +25,7 @@ use limits::{bound, decode_base64, json_bytes, preflight_json};
 mod principal;
 pub use principal::{ConversationPair, Principal};
 pub mod application;
+pub mod files;
 mod native;
 pub mod sync;
 pub use native::{NativeRelayRoute, unverified_native_route};

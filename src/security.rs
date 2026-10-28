@@ -14,6 +14,8 @@ pub const RELAY_ONLY_TYPES: &[CommunicationType] = &[
     CommunicationType::MessageDeleteLive,
     CommunicationType::MessageOtherIota,
     CommunicationType::SetChatSecret,
+    CommunicationType::FileShareOffered,
+    CommunicationType::FileShareRevoked,
     CommunicationType::SendChat,
     CommunicationType::SettingsSave,
     CommunicationType::GlobalSettingsSave,
