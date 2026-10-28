@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 tau-relay-protocol = { path = "relay-protocol" }
-mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "db3125809293e462ec1593704e9c4d2172437533", features = ["host", "crypto"] }
+mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "87c535650a3a33b166139b02cdd7327d412d3bca", features = ["host", "crypto"] }
 dashmap = "6.1"
 thiserror = "2"
 tokio = { version = "1", features = ["sync", "time"] }
@@ -19,6 +19,6 @@ libc = "0.2"
 
 [dev-dependencies]
 base64 = "0.22"
-mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "db3125809293e462ec1593704e9c4d2172437533", features = ["web-server", "client"] }
+mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "87c535650a3a33b166139b02cdd7327d412d3bca", features = ["web-server", "client"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 rcgen = "0.14"

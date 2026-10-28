@@ -11,6 +11,14 @@ use tokio::sync::oneshot;
 type Responder = Box<dyn FnOnce(Result<CommunicationValue, RequestError>) -> bool + Send + Sync>;
 type Validator = std::sync::Arc<dyn Fn(&CommunicationValue) -> bool + Send + Sync>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompletionOutcome {
+    UnknownOrExpired,
+    UnexpectedResponse,
+    Delivered,
+    DeliveryFailed,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum CorrelationError {
     #[error("invalid correlation id")]
@@ -291,21 +299,31 @@ impl ResponseCorrelator {
     }
 
     pub fn complete(&self, id: u32, response: CommunicationValue) -> bool {
+        self.complete_diagnostic(id, response) == CompletionOutcome::Delivered
+    }
+
+    /// Reports correlation failures without logging packet contents. Rejected
+    /// response types leave the matching registration pending.
+    pub fn complete_diagnostic(&self, id: u32, response: CommunicationValue) -> CompletionOutcome {
         let (generation, validator) = {
             let state = self.state.lock().unwrap();
             let Some(entry) = state.entries.get(&id) else {
-                return false;
+                return CompletionOutcome::UnknownOrExpired;
             };
             (entry.generation, entry.validator.clone())
         };
         // Application validation and callbacks never run under the map lock.
         if validator.is_some_and(|validate| !validate(&response)) {
-            return false;
+            return CompletionOutcome::UnexpectedResponse;
         }
         let Some(entry) = self.detach(id, generation) else {
-            return false;
+            return CompletionOutcome::UnknownOrExpired;
         };
-        (entry.respond)(Ok(response))
+        if (entry.respond)(Ok(response)) {
+            CompletionOutcome::Delivered
+        } else {
+            CompletionOutcome::DeliveryFailed
+        }
     }
 
     fn detach(&self, id: u32, generation: u64) -> Option<Correlation> {

@@ -12,12 +12,12 @@ crate-type = ["rlib", "cdylib"]
 wasm = ["dep:wasm-bindgen", "dep:mtp-crypto", "dep:getrandom"]
 
 [dependencies]
-mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "db3125809293e462ec1593704e9c4d2172437533", default-features = false, features = ["crypto"] }
-mtp-type-map = { git = "https://github.com/Nonanium/MTP.git", rev = "db3125809293e462ec1593704e9c4d2172437533", features = ["registry"] }
+mtp = { git = "https://github.com/Nonanium/MTP.git", rev = "87c535650a3a33b166139b02cdd7327d412d3bca", default-features = false, features = ["crypto"] }
+mtp-type-map = { git = "https://github.com/Nonanium/MTP.git", rev = "87c535650a3a33b166139b02cdd7327d412d3bca", features = ["registry"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
 thiserror = "2"
 wasm-bindgen = { version = "0.2", optional = true }
-mtp-crypto = { git = "https://github.com/Nonanium/MTP.git", rev = "db3125809293e462ec1593704e9c4d2172437533", features = ["wasm"], optional = true }
+mtp-crypto = { git = "https://github.com/Nonanium/MTP.git", rev = "87c535650a3a33b166139b02cdd7327d412d3bca", features = ["wasm"], optional = true }
 getrandom = { version = "0.2", features = ["js"], optional = true }

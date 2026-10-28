@@ -38,8 +38,8 @@ pub use mtp_compat::{
     positive_data_i64,
 };
 pub use requests::{
-    CorrelationError, PROTOCOL_ERROR_TYPES, PendingResponse, RequestError, ResponseCorrelator,
-    ResponseExpectation, is_protocol_error, password_response_expectation,
+    CompletionOutcome, CorrelationError, PROTOCOL_ERROR_TYPES, PendingResponse, RequestError,
+    ResponseCorrelator, ResponseExpectation, is_protocol_error, password_response_expectation,
 };
 pub use role::{AuthenticationRequirement, RoleRule, RoleRules};
 pub use route::RouteTarget;
