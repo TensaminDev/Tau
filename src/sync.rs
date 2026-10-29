@@ -10,7 +10,7 @@ pub fn encode_request(
     if !request.validate()
         || !map
             .fingerprint_hex()
-            .is_some_and(|hash| dictionaries_compatible(&hash, &request.scope().dictionary))
+            .is_some_and(|hash| dictionaries_compatible(&hash, request.dictionary()))
         || CommunicationType::AccountStateRequest
             .try_to_id(map)
             .is_none()
@@ -51,7 +51,7 @@ pub fn decode_request(frame: &CommunicationValue) -> Result<Request, SyncError> 
     if !request.validate()
         || !map
             .fingerprint_hex()
-            .is_some_and(|hash| dictionaries_compatible(&hash, &request.scope().dictionary))
+            .is_some_and(|hash| dictionaries_compatible(&hash, request.dictionary()))
     {
         return Err(SyncError::InvalidRequest);
     }
@@ -101,6 +101,13 @@ pub fn decode_response(
         serde_json::from_slice(bytes).map_err(|_| SyncError::InvalidRequest)?;
     let valid = match (&response, &expected) {
         (Response::Unavailable { .. }, _) => true,
+        (
+            Response::Scope { scope },
+            Request::Discover {
+                device_id,
+                dictionary,
+            },
+        ) => scope.validate() && &scope.device_id == device_id && &scope.dictionary == dictionary,
         (
             Response::Snapshot {
                 scope,

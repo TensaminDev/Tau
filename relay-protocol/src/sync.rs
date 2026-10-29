@@ -54,6 +54,10 @@ pub struct Cursor {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    Discover {
+        device_id: String,
+        dictionary: String,
+    },
     Snapshot {
         scope: Scope,
         page: Option<PageToken>,
@@ -71,17 +75,36 @@ pub enum Request {
 }
 
 impl Request {
-    pub fn scope(&self) -> &Scope {
+    pub fn scope(&self) -> Option<&Scope> {
         match self {
-            Self::Snapshot { scope, .. } => scope,
-            Self::Delta { after, .. } => &after.scope,
-            Self::Acknowledge { cursor, .. } => &cursor.scope,
+            Self::Discover { .. } => None,
+            Self::Snapshot { scope, .. } => Some(scope),
+            Self::Delta { after, .. } => Some(&after.scope),
+            Self::Acknowledge { cursor, .. } => Some(&cursor.scope),
+        }
+    }
+
+    pub fn dictionary(&self) -> &str {
+        match self {
+            Self::Discover { dictionary, .. } => dictionary,
+            _ => &self.scope().expect("scoped sync request").dictionary,
         }
     }
 
     pub fn validate(&self) -> bool {
-        self.scope().validate()
+        self.scope().is_none_or(Scope::validate)
             && match self {
+                Self::Discover {
+                    device_id,
+                    dictionary,
+                } => {
+                    !device_id.is_empty()
+                        && device_id.len() <= 128
+                        && device_id
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b"-_.:".contains(&byte))
+                        && dictionaries_compatible(dictionary, dictionary)
+                }
                 Self::Snapshot { page, limit, .. } => valid_page(page, *limit),
                 Self::Delta { after, page, limit } => {
                     after.sequence >= 0 && valid_page(page, *limit)
@@ -179,6 +202,9 @@ impl TryFrom<&str> for Entity {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Response {
+    Scope {
+        scope: Scope,
+    },
     Snapshot {
         scope: Scope,
         head: i64,
